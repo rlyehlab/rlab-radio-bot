@@ -1,0 +1,6 @@
+httpx==0.28.1
+python-dotenv==1.2.4
+python-telegram-bot==22.8
+# Unpinned on purpose: YouTube breaks old yt-dlp versions often,
+# so every image rebuild should pull the latest release.
+yt-dlp[default]

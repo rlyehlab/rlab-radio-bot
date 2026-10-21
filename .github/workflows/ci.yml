@@ -1,0 +1,56 @@
+name: CI / Deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  # Manual run from the Actions tab: rebuilds the image with the latest yt-dlp
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Lint, Test & Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt ruff pytest
+
+      - name: Lint
+        run: ruff check .
+
+      - name: Test
+        run: pytest
+
+      - name: Build Docker image
+        run: docker build -t rlab-radio-bot .
+
+  deploy:
+    name: Deploy
+    needs: build
+    runs-on: self-hosted
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          port: ${{ secrets.SSH_PORT || 22 }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            git pull origin main
+            # --no-cache so every deploy installs the latest yt-dlp
+            docker compose build --pull --no-cache
+            docker compose up -d
